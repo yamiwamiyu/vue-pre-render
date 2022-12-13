@@ -1,0 +1,24 @@
+{
+  "name": "vue-pre-render",
+  "version": "1.0.0",
+  "description": "pre-render for vue project",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "prerender",
+    "pre-render",
+    "seo",
+    "automation",
+    "crawler",
+    "vue",
+    "puppeteer"
+  ],
+  "author": "yamiwamiyu",
+  "license": "ISC",
+  "dependencies": {
+    "puppeteer": "^19.4.0"
+  },
+  "type": "module"
+}
