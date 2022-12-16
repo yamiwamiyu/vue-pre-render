@@ -26,32 +26,66 @@ import puppeteer from 'puppeteer-core'(已有Chrome浏览器) | 'puppeteer'(自�
    等待页面加载成功：await page.waitFor***，常用等待某个dom加载完成await page.waitForSelector("选择器", {timeout: 0});
    执行js：await page.evaluate(() => { ...js代码，相当于Chrome F12的Console，return 结果 })
 */
-exports.prerender = async function (config = {
-  port: 9222,
-  chrome: "",
-}) {
-  
+function check(bool, err) {
+  if (!bool) return;
+  console.log('\x1b[41m', err, '\x1b[0m');
+  exit();
 }
 
-const puppeteer = require('puppeteer-core');
-const fs = require('fs');
-const path = require('path');
-const axios = require('axios');
-const express = require('express');
-const { Server } = require('http');
+exports.prerender = async function (config) {
+  config = Object.assign({
+    port: 9222,
+    dist: "dist",
+    serve: 21644,
+  }, config);
+  console.log("调用了prerender，参数", config)
+}
+
+// const puppeteer = require('puppeteer-core');
+// const fs = require('fs');
+// const path = require('path');
+// const axios = require('axios');
+// const express = require('express');
+// const { exit } = require('process');
+
+// // todo: 预渲染页面可以修改title和meta
+// // todo: 多语言，动态meta，带参路由需要想办法解决
+// // todo: 发布目录为./时可以不开express直接文件访问进行预渲染，但是多级目录可能会有问题
+// // todo: 能连上已开的chrome就不用自己开新的chrome了
+// // todo: 实际地址和路由不一致时预渲染index.html，例如页面检测需要登录最终跳转到了登录页时
+// // todo: 使用launch打开浏览器时，每次打开localStorage都会是空的，需要渲染需要登录的页面时可以选用连接模式
 
 (async (config = {
   // 使用已开chrome时的--remote-debugging-port参数值
   port: 9222,
   // 没有已开chrome时自动打开chrome的运行程序路径
-  chrome: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+  //chrome: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
   // vue发布的目录
   dist: "dist",
   // 使用express对vue发布的目录提供网站服务
   serve: 21644,
-  // 需要预渲染的路由页面
-  pages: ['/', '/pre', '/dir/indir'],
+  // 全局seo配置，会默认应用到全部页面
+  seo: {
+    // 网页标题
+    title: "global title",
+    // <meta name="keywords" content="keyword1, keyword2, keyword3">
+    // 不使用数组时可以是字符串，关键词之间应该用', '隔开
+    keywords: ["keyword1", "keyword2", "keyword3"],
+    // <meta name="description" content="Your website description">
+    description: "Your website description",
+    // 其它meta信息，这里配置的keywords和description会覆盖
+    meta: [
+      { name: 'metaname1', content: 'meta content1' },
+      { name: 'metaname2', content: 'meta content2' },
+    ]
+  },
+  // 需要预渲染的页面路由
+  // 如果页面有跳转的，例如需要登录的页面因为没有登录跳转到了登录页
+  // 页面将预渲染默认内容，seo信息也将不会被渲染进页面
+  pages: ['/', '/pre', '/dir/indir', '/nopre'],
 }) => {
+  check(!fs.existsSync(config.dist), "Don't exists dist directory! " + path.resolve(__dirname, config.dist));
+
   let browser;
   if (config.chrome) {
     browser = await puppeteer.launch({
@@ -76,9 +110,6 @@ const { Server } = require('http');
 
   console.log("Connect chrome success!");
 
-  // const pages = await browser.pages();
-  // console.log("Get pages success!");
-
   const serve = express();
   serve.listen(config.serve);
   serve.use(express.static(config.dist));
@@ -100,57 +131,24 @@ const { Server } = require('http');
         idleTime: 1000,
         timeout: 5000,
       })
-      if (temp == '/')
-        temp = '/index';
-      temp = config.dist + temp + ".html";
-      const dir = path.dirname(temp);
+      let html = temp;
+      if (html == '/')
+        html = '/index';
+      html = config.dist + html + ".html";
+      const dir = path.dirname(html);
       if (!fs.existsSync(dir))
         fs.mkdirSync(dir);
-      console.log("page load complete", page.url(), temp);
-      fs.writeFileSync(temp, await page.evaluate(() => "<!DOCTYPE html>" + document.documentElement.outerHTML));
+      if (await page.evaluate(t => location.pathname != t, temp)) {
+        console.log("The route page is redirected", temp, "->", page.url());
+      }
+      fs.writeFileSync(html, await page.evaluate(() => {
+        // 下次启动浏览器这里设置的值将会不见，所以登录问题不能这样解决
+        // localStorage.setItem("test", "Puppeteer设置的localStorage值");
+        // 替换title，meta
+        //document.title = 
+        return "<!DOCTYPE html>" + document.documentElement.outerHTML;
+      }));
+      // await page.close();
     })
   }
-
-  // let page = pages.find(i => i.url().startsWith("https://futcoin.net/en/reviews"));
-  
-  // console.log("已找到目标页面标签", page.url())
-  
-
-  // const FILE = "采集.csv"
-  // fs.writeFileSync(FILE, "评论人,国家,时间,金币数,平台,星星数,内容,版本\r\n")
-
-  // for (let i = 0; i < 100; i++) {
-  //   console.log("正在采集", page.url())
-  //   await page.waitForSelector(".fc-comment", {
-  //     timeout: 0,
-  //   });
-  //   fs.appendFileSync(FILE, await page.evaluate(() => {
-  //     var result = "";
-  //     var comments = document.querySelectorAll(".fc-comment");
-  //     for (var c of comments) {
-  //       if (c.querySelector(".uk-card>.uk-text-left").innerText.indexOf(' ') == -1)
-  //         continue;
-  //       result += c.querySelector(".uk-first-column .uk-text-left").innerText + "," +
-  //         ((i) => {
-  //           var index = i.lastIndexOf('/') + 1;
-  //           return i.substring(index, index + 2).toUpperCase();
-  //         })(c.querySelector(".uk-first-column [data-uk-img]").dataset.src) + "," +
-  //         c.querySelector(".uk-first-column .uk-text-muted").innerText + "," +
-  //         ((i) => {
-  //           return i = i.substring(1, i.indexOf(' ', 1)).replaceAll(',', '');
-  //         })(c.querySelector(".uk-width-expand .uk-first-column").innerText) + "," +
-  //         ((i) => {
-  //           return i.startsWith(' PC') ? 'pc' : (i.startsWith(' PlayStation') ? 'ps4' : 'xbox')
-  //         })(c.querySelector(".uk-width-expand .uk-text-nowrap").innerText) + "," +
-  //         c.querySelector(".fc-comment-rating").querySelectorAll(".fc-icon-star").length + "," +
-  //         '"' + c.querySelector(".uk-card>.uk-text-left").innerText.replaceAll('"', '""') + '",' +
-  //         "fifa23" + "\r\n"
-  //     }
-  //     return result;
-  //   }));
-  //   // 点击下一页
-  //   await page.click('[data-uk-icon="arrow-right"]');
-  //   await page.waitForTimeout(2000);
-  // }
-  // console.log("采集完成");
 })();

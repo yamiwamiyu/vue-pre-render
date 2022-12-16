@@ -1,0 +1,25 @@
+{
+  "port": 9222,
+  "dist": "dist",
+  "serve": 21644,
+  "seo": {
+    "title": "global title",
+    "keywords": [
+      "keyword1",
+      "keyword2",
+      "keyword3"
+    ],
+    "description": "Your website description",
+    "meta": [
+      { 
+        "name": "metaname1", 
+        "content": "meta content1"
+      },
+      { 
+        "name": "metaname2", 
+        "content": "meta content2"
+      }
+    ]
+  },
+  "pages": ["/", "/pre", "/dir/indir", "/nopre"]
+}
