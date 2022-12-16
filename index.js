@@ -26,40 +26,161 @@ import puppeteer from 'puppeteer-core'(已有Chrome浏览器) | 'puppeteer'(自�
    等待页面加载成功：await page.waitFor***，常用等待某个dom加载完成await page.waitForSelector("选择器", {timeout: 0});
    执行js：await page.evaluate(() => { ...js代码，相当于Chrome F12的Console，return 结果 })
 */
+
+let puppeteer = require('puppeteer-core');
+const fs = require('fs');
+const path = require('path');
+const axios = require('axios');
+const express = require('express');
+const { exit } = require('process');
+
 function check(bool, err) {
   if (!bool) return;
   console.log('\x1b[41m', err, '\x1b[0m');
   exit();
 }
 
+function seo(seo) {
+  if (!seo) return;
+  if (typeof (seo.keywords) != 'string')
+    seo.keywords = seo.keywords.join(", ");
+  if (seo.meta?.length)
+    for (const meta of seo.meta)
+      seo[meta.name] = meta.content;
+}
+
 exports.prerender = async function (config) {
   config = Object.assign({
     port: 9222,
+    headless: false,
     dist: "dist",
     serve: 21644,
   }, config);
-  console.log("调用了prerender，参数", config)
+  check(!fs.existsSync(config.dist), "Don't exists dist directory! " + path.resolve(__dirname, config.dist));
+  seo(config.seo);
+  for (let i = 0; i < config.pages.length; i++) {
+    if (typeof (config.pages[i]) == "string")
+      config.pages[i] = { url: config.pages[i] };
+    seo(config.pages[i].seo);
+  }
+
+  let browser;
+  if (config.chrome) {
+    browser = await puppeteer.launch({
+      headless: config.headless,
+      executablePath: config.chrome,
+      defaultViewport: null
+    })
+    console.log("Open chrome success!");
+  } else {
+    const browserWSEndpoint = await new Promise(resolve => {
+      const url = "http://127.0.0.1:" + config.port + "/json/version";
+      axios.get(url).then((ret) => {
+        resolve(ret.data.webSocketDebuggerUrl);
+      }).catch(err => {
+        console.log("Can not connect chrome.", url);
+        resolve(undefined);
+      })
+    })
+    if (browserWSEndpoint) {
+      browser = await puppeteer.connect({ browserWSEndpoint, defaultViewport: null });
+      console.log("Connect chrome success!");
+    } else {
+      puppeteer = require('puppeteer');
+      browser = await puppeteer.launch({
+        headless: config.headless,
+        defaultViewport: null
+      })
+      console.log("Open chromium success!");
+    }
+  }
+
+  const serve = express();
+  serve.listen(config.serve);
+  serve.use(express.static(config.dist));
+  // 缓存index.html，history模式访问路由时，都因该返回index.html的内容
+  // 保留index.html到__index.html，方便出错需要重新预渲染时不用重新发布项目
+  let indexHtml;
+  if (fs.existsSync(config.dist + '/__index.html')) {
+    indexHtml = fs.readFileSync(config.dist + '/__index.html', "utf-8");
+    console.log("use __index.html")
+  } else {
+    indexHtml = fs.readFileSync(config.dist + '/index.html', "utf-8");
+    fs.copyFileSync(config.dist + '/index.html', config.dist + '/__index.html');
+  }
+  const responseIndex = (req, res) => res.send(indexHtml);
+  for (const route of config.pages)
+    serve.get(route.url, responseIndex);
+
+  console.log("Express serve launched!", "http://localhost:" + config.serve + " in " + config.dist);
+
+  for (const route of config.pages) {
+    // 逐个打开路由页面，将预渲染页面的html写入对应路由.html
+    let temp = route.url;
+    route.exe = browser.newPage().then(async (page) => {
+      await page.goto("http://localhost:" + config.serve + temp);
+      await page.waitForNetworkIdle({
+        idleTime: 1000,
+        timeout: 5000,
+      })
+      let html = temp;
+      if (html == '/')
+        html = '/index';
+      if ((pindex = html.indexOf('?')) >= 0) {
+        html = html.substring(0, pindex);
+        console.log("有参数", html)
+      }
+      html = config.dist + html + ".html";
+      const dir = path.dirname(html);
+      if (!fs.existsSync(dir))
+        fs.mkdirSync(dir);
+      const redirected = await page.evaluate(t => location.pathname != t, temp);
+      if (redirected) {
+        console.log("\x1b[33mpage redirected!", temp, "->", await page.evaluate(() => location.pathname), "\x1b[0m");
+        fs.writeFileSync(html, indexHtml);
+      } else {
+        fs.writeFileSync(html, await page.evaluate((config, route) => {
+          document.title = route.seo?.title || config.seo?.title || document.title;
+          function meta(key) {
+            let meta = document.querySelector("meta[name='" + key + "']");
+            if (!meta) {
+              meta = document.createElement("meta");
+              meta.name = key;
+              document.head.appendChild(meta);
+            }
+            meta.content = (route.seo && route.seo[key]) || (config.seo && config.seo[key]) || meta.content;
+          }
+          meta('keywords');
+          meta('description');
+          if (config.seo?.meta)
+            for (const item of config.seo.meta)
+              meta(item.name);
+          if (route.seo?.meta)
+            for (const item of route.seo.meta)
+              meta(item.name);
+          return "<!DOCTYPE html>" + document.documentElement.outerHTML;
+        }, config, route));
+      }
+      if (!redirected) {
+        console.log("render complete!", temp);
+        await page.close();
+      }
+    })
+  }
+
+  for (const route of config.pages)
+    await route.exe;
+
+  console.log("Pre rendering is complete!")
 }
 
-// const puppeteer = require('puppeteer-core');
-// const fs = require('fs');
-// const path = require('path');
-// const axios = require('axios');
-// const express = require('express');
-// const { exit } = require('process');
-
-// // todo: 预渲染页面可以修改title和meta
-// // todo: 多语言，动态meta，带参路由需要想办法解决
-// // todo: 发布目录为./时可以不开express直接文件访问进行预渲染，但是多级目录可能会有问题
-// // todo: 能连上已开的chrome就不用自己开新的chrome了
-// // todo: 实际地址和路由不一致时预渲染index.html，例如页面检测需要登录最终跳转到了登录页时
-// // todo: 使用launch打开浏览器时，每次打开localStorage都会是空的，需要渲染需要登录的页面时可以选用连接模式
-
-(async (config = {
+// todo: 多语言，动态meta，带参路由需要想办法解决
+// todo: 发布目录为./时可以不开express直接文件访问进行预渲染，但是多级目录可能会有问题
+exports.prerender(config = {
   // 使用已开chrome时的--remote-debugging-port参数值
   port: 9222,
   // 没有已开chrome时自动打开chrome的运行程序路径
-  //chrome: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+  chrome: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
   // vue发布的目录
   dist: "dist",
   // 使用express对vue发布的目录提供网站服务
@@ -82,73 +203,15 @@ exports.prerender = async function (config) {
   // 需要预渲染的页面路由
   // 如果页面有跳转的，例如需要登录的页面因为没有登录跳转到了登录页
   // 页面将预渲染默认内容，seo信息也将不会被渲染进页面
-  pages: ['/', '/pre', '/dir/indir', '/nopre'],
-}) => {
-  check(!fs.existsSync(config.dist), "Don't exists dist directory! " + path.resolve(__dirname, config.dist));
-
-  let browser;
-  if (config.chrome) {
-    browser = await puppeteer.launch({
-      headless: false,
-      executablePath: config.chrome,
-      defaultViewport: null
-    })
-  } else {
-    const browserWSEndpoint = await new Promise(resolve => {
-      const url = "http://127.0.0.1:" + config.port + "/json/version";
-      axios.get(url).then((ret) => {
-        resolve(ret.data.webSocketDebuggerUrl);
-      }).catch(err => {
-        console.log("Can not connect chrome.", url);
-      })
-    })
-
-    console.log("browserWSEndpoint", browserWSEndpoint);
-
-    browser = await puppeteer.connect({ browserWSEndpoint, defaultViewport: null });
-  }
-
-  console.log("Connect chrome success!");
-
-  const serve = express();
-  serve.listen(config.serve);
-  serve.use(express.static(config.dist));
-  
-  // 缓存index.html，history模式访问路由时，都因该返回index.html的内容
-  const indexHtml = fs.readFileSync(config.dist + '/index.html', "utf-8");
-  const responseIndex = (req, res) => res.send(indexHtml);
-  for (const route of config.pages)
-    serve.get(route, responseIndex);
-
-  console.log("Express serve launched!", "http://localhost:" + config.serve + " in " + config.dist);
-
-  for (const route of config.pages) {
-    // 逐个打开路由页面，将预渲染页面的html写入对应路由.html
-    let temp = route;
-    browser.newPage().then(async (page) => {
-      await page.goto("http://localhost:" + config.serve + route);
-      await page.waitForNetworkIdle({
-        idleTime: 1000,
-        timeout: 5000,
-      })
-      let html = temp;
-      if (html == '/')
-        html = '/index';
-      html = config.dist + html + ".html";
-      const dir = path.dirname(html);
-      if (!fs.existsSync(dir))
-        fs.mkdirSync(dir);
-      if (await page.evaluate(t => location.pathname != t, temp)) {
-        console.log("The route page is redirected", temp, "->", page.url());
-      }
-      fs.writeFileSync(html, await page.evaluate(() => {
-        // 下次启动浏览器这里设置的值将会不见，所以登录问题不能这样解决
-        // localStorage.setItem("test", "Puppeteer设置的localStorage值");
-        // 替换title，meta
-        //document.title = 
-        return "<!DOCTYPE html>" + document.documentElement.outerHTML;
-      }));
-      // await page.close();
-    })
-  }
-})();
+  pages: ['/', {
+    url: '/pre/abc',
+    seo: {
+      title: "Pre Title",
+      keywords: ["Pre Render", "Pre-render"],
+      description: "Pre page is a test page",
+      meta: [
+        { name: 'pre', content: 'pre-render' },
+      ]
+    }
+  }, '/dir/indir?test=a', '/nopre'],
+})
