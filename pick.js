@@ -1,5 +1,6 @@
 const puppeteer = require('puppeteer-core');
 const axios = require('axios');
+const fs = require('fs');
 
 (async () => {
   const browserWSEndpoint = await new Promise(resolve => {
