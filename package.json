@@ -1,5 +1,5 @@
 {
-  "name": "vue-pre-render",
+  "name": "@yamiwamiyu/vue-pre-render",
   "version": "1.0.0",
   "description": "pre-render for vue project",
   "main": "index.js",
