@@ -1,6 +1,8 @@
 {
   "port": 9222,
+  "chrome": "",
   "dist": "dist",
+  "headless": false,
   "serve": 21644,
   "seo": {
     "title": "global title",

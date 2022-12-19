@@ -88,7 +88,7 @@ async function getBrowser(config) {
   return browser;
 }
 
-exports.prerender = async function (config) {
+async function prerender(config) {
   config = Object.assign({
     port: 9222,
     headless: false,
@@ -188,6 +188,34 @@ exports.prerender = async function (config) {
   console.log("Pre rendering is complete!")
   await browser.close();
 }
+
+exports.prerender = prerender;
+
+function VuePreRender(option) { this.option = option; }
+VuePreRender.prototype.apply = function (compiler) {
+  compiler.hooks.afterEmit.tapAsync('VuePreRender', (compilation, callback) => {
+    console.log(
+      '这里表示了资源的单次构建的 `compilation` 对象：',
+      compilation,
+      '还有使用插件的option',
+      this.option
+    );
+    let config = this.option;
+    if (typeof (config) == 'string')
+      // 使用配置文件
+      config = JSON.parse(fs.readFileSync(config, "utf-8"));
+    if (typeof (config) == 'object') {
+      // 预渲染
+      new Promise().then(async () => {
+        await prerender(config)
+      }).finally(() => callback());
+    } else {
+      console.log("error compilation option!", this.option);
+      callback();
+    }
+  })
+}
+exports.VuePreRender = VuePreRender;
 
 exports.crawl = async function (config, onResponse, crawl) {
   let browser = await getBrowser(config);
