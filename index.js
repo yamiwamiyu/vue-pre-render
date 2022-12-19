@@ -49,6 +49,45 @@ function seo(seo) {
       seo[meta.name] = meta.content;
 }
 
+async function getBrowser(config) {
+  let browser;
+  if (config.chrome) {
+    browser = await puppeteer.launch({
+      headless: config.headless,
+      executablePath: config.chrome,
+      defaultViewport: null
+    })
+    console.log("Open chrome success!");
+  } else {
+    let browserWSEndpoint;
+    if (config.port) {
+      browserWSEndpoint = await new Promise(resolve => {
+        const url = "http://127.0.0.1:" + config.port + "/json/version";
+        axios.get(url).then((ret) => {
+          resolve(ret.data.webSocketDebuggerUrl);
+        }).catch(err => {
+          console.log("Can not connect chrome.", url);
+          resolve(undefined);
+        })
+      })
+    }
+    if (browserWSEndpoint) {
+      browser = await puppeteer.connect({ browserWSEndpoint, defaultViewport: null });
+      // 不需要关闭chrome
+      browser.close = () => {};
+      console.log("Connect chrome success!");
+    } else {
+      puppeteer = require('puppeteer');
+      browser = await puppeteer.launch({
+        headless: config.headless,
+        defaultViewport: null
+      });
+      console.log("Open chromium success!");
+    }
+  }
+  return browser;
+}
+
 exports.prerender = async function (config) {
   config = Object.assign({
     port: 9222,
@@ -64,53 +103,26 @@ exports.prerender = async function (config) {
     seo(config.pages[i].seo);
   }
 
-  let browser;
-  if (config.chrome) {
-    browser = await puppeteer.launch({
-      headless: config.headless,
-      executablePath: config.chrome,
-      defaultViewport: null
-    })
-    console.log("Open chrome success!");
-  } else {
-    const browserWSEndpoint = await new Promise(resolve => {
-      const url = "http://127.0.0.1:" + config.port + "/json/version";
-      axios.get(url).then((ret) => {
-        resolve(ret.data.webSocketDebuggerUrl);
-      }).catch(err => {
-        console.log("Can not connect chrome.", url);
-        resolve(undefined);
-      })
-    })
-    if (browserWSEndpoint) {
-      browser = await puppeteer.connect({ browserWSEndpoint, defaultViewport: null });
-      console.log("Connect chrome success!");
-    } else {
-      puppeteer = require('puppeteer');
-      browser = await puppeteer.launch({
-        headless: config.headless,
-        defaultViewport: null
-      })
-      console.log("Open chromium success!");
-    }
-  }
+  let browser = await getBrowser(config);
 
   const serve = express();
   serve.listen(config.serve);
   serve.use(express.static(config.dist));
   // 缓存index.html，history模式访问路由时，都因该返回index.html的内容
-  // 保留index.html到__index.html，方便出错需要重新预渲染时不用重新发布项目
-  let indexHtml;
-  if (fs.existsSync(config.dist + '/__index.html')) {
-    indexHtml = fs.readFileSync(config.dist + '/__index.html', "utf-8");
-    console.log("use __index.html")
-  } else {
-    indexHtml = fs.readFileSync(config.dist + '/index.html', "utf-8");
-    fs.copyFileSync(config.dist + '/index.html', config.dist + '/__index.html');
-  }
+  let indexHtml = fs.readFileSync(config.dist + '/index.html', "utf-8");
+  // test: 保留index.html到__index.html，方便出错需要重新预渲染时不用重新发布项目
+  // if (fs.existsSync(config.dist + '/__index.html')) {
+  //   indexHtml = fs.readFileSync(config.dist + '/__index.html', "utf-8");
+  //   console.log("use __index.html")
+  // } else {
+  //   fs.copyFileSync(config.dist + '/index.html', config.dist + '/__index.html');
+  // }
   const responseIndex = (req, res) => res.send(indexHtml);
-  for (const route of config.pages)
+  for (const route of config.pages) {
     serve.get(route.url, responseIndex);
+    if ((pindex = route.url.indexOf('?')) >= 0)
+      serve.get(route.url.substring(0, pindex), responseIndex);
+  }
 
   console.log("Express serve launched!", "http://localhost:" + config.serve + " in " + config.dist);
 
@@ -123,13 +135,15 @@ exports.prerender = async function (config) {
         idleTime: 1000,
         timeout: 5000,
       })
-      let html = temp;
+      if ((pindex = temp.indexOf('?')) >= 0)
+        temp = temp.substring(0, pindex);
+      let html;
+      if (route.output)
+        html = route.output;
+      else
+        html = temp;
       if (html == '/')
         html = '/index';
-      if ((pindex = html.indexOf('?')) >= 0) {
-        html = html.substring(0, pindex);
-        console.log("有参数", html)
-      }
       html = config.dist + html + ".html";
       const dir = path.dirname(html);
       if (!fs.existsSync(dir))
@@ -172,14 +186,29 @@ exports.prerender = async function (config) {
     await route.exe;
 
   console.log("Pre rendering is complete!")
+  await browser.close();
 }
 
-// todo: 多语言，动态meta，带参路由需要想办法解决
-// todo: 发布目录为./时可以不开express直接文件访问进行预渲染，但是多级目录可能会有问题
+exports.crawl = async function (config, onRequest, crawl) {
+  let browser = await getBrowser(config);
+  const page = browser.newPage();
+  if (onRequest) {
+    await page.setRequestInterception();
+    page.on("request", request => {
+      if (request.response())
+        onRequest(request);
+      request.continue();
+    })
+  }
+  if (crawl)
+    await crawl(page);
+  await browser.close();
+}
+
 exports.prerender(config = {
   // 使用已开chrome时的--remote-debugging-port参数值
   port: 9222,
-  // 没有已开chrome时自动打开chrome的运行程序路径
+  // 没有已开chrome时自动打开chrome的运行程序路径，chrome以外的浏览器貌似也可以
   chrome: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
   // vue发布的目录
   dist: "dist",
@@ -205,6 +234,7 @@ exports.prerender(config = {
   // 页面将预渲染默认内容，seo信息也将不会被渲染进页面
   pages: ['/', {
     url: '/pre/abc',
+    output: '/pre',
     seo: {
       title: "Pre Title",
       keywords: ["Pre Render", "Pre-render"],
@@ -213,5 +243,5 @@ exports.prerender(config = {
         { name: 'pre', content: 'pre-render' },
       ]
     }
-  }, '/dir/indir?test=a', '/nopre'],
+  }, '/dir/indir?param=value', '/nopre'],
 })
