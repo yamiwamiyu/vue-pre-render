@@ -1,32 +1,3 @@
-// node -v v16.17.0
-// npm -v 8.15.0
-
-/*
-puppeteer学习日记
-npm官方地址：https://www.npmjs.com/package/puppeteer
-官方文档：https://pptr.dev/
-主要用法如下
-import puppeteer from 'puppeteer-core'(已有Chrome浏览器) | 'puppeteer'(自动下载的Chromium浏览器);
-1. 获取浏览器browser
-   启动一个新实例：puppeteer.launch({
-     headless: true,  // true: 无UI界面 / false: 弹出浏览器界面
-     executablePath: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe", // 已有Chrome浏览器时浏览器的运行路径
-   })
-   连接一个已开实例：puppeteer.connect({
-     // 带参数--remote-debugging-port=9222运行chrome.exe，可以用快捷方式 -> 属性 -> 目标，或者cmd方式运行
-     // 浏览器地址输入http://127.0.0.1:9222/json/version，可看见一个json对象，webSocketDebuggerUrl就是目标值
-     browserWSEndpoint: "ws://127.0.0.1:9222/devtools/browser/fd848984-50fb-4ebb-9236-a8c62d6cb0a9",
-   })
-2. 获取页面page
-   获取所有页签：const pages = await browser.pages()
-   可通过find方法根据url找到目标页签：const page = pages.find(i => return i.url().startsWith('<your url>'))
-   新开启一个页签：const page = await browser.newPage()
-3. 页面操作
-   修改url：await page.goto(url)
-   等待页面加载成功：await page.waitFor***，常用等待某个dom加载完成await page.waitForSelector("选择器", {timeout: 0});
-   执行js：await page.evaluate(() => { ...js代码，相当于Chrome F12的Console，return 结果 })
-*/
-
 let puppeteer = require('puppeteer-core');
 const fs = require('fs');
 const path = require('path');
@@ -221,44 +192,3 @@ exports.crawl = async function (config, onResponse, crawl) {
   await page.close();
   await browser.close();
 }
-
-// exports.prerender(config = {
-//   // 使用已开chrome时的--remote-debugging-port参数值
-//   port: 9222,
-//   // 没有已开chrome时自动打开chrome的运行程序路径，chrome以外的浏览器貌似也可以
-//   chrome: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
-//   // vue发布的目录
-//   dist: "dist",
-//   // 使用express对vue发布的目录提供网站服务
-//   serve: 21644,
-//   // 全局seo配置，会默认应用到全部页面
-//   seo: {
-//     // 网页标题
-//     title: "global title",
-//     // <meta name="keywords" content="keyword1, keyword2, keyword3">
-//     // 不使用数组时可以是字符串，关键词之间应该用', '隔开
-//     keywords: ["keyword1", "keyword2", "keyword3"],
-//     // <meta name="description" content="Your website description">
-//     description: "Your website description",
-//     // 其它meta信息，这里配置的keywords和description会覆盖
-//     meta: [
-//       { name: 'metaname1', content: 'meta content1' },
-//       { name: 'metaname2', content: 'meta content2' },
-//     ]
-//   },
-//   // 需要预渲染的页面路由
-//   // 如果页面有跳转的，例如需要登录的页面因为没有登录跳转到了登录页
-//   // 页面将预渲染默认内容，seo信息也将不会被渲染进页面
-//   pages: ['/', {
-//     url: '/pre/abc',
-//     output: '/pre',
-//     seo: {
-//       title: "Pre Title",
-//       keywords: ["Pre Render", "Pre-render"],
-//       description: "Pre page is a test page",
-//       meta: [
-//         { name: 'pre', content: 'pre-render' },
-//       ]
-//     }
-//   }, '/dir/indir?param=value', '/nopre'],
-// })

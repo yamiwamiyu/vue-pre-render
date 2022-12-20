@@ -1,0 +1,8 @@
+# directories
+node_modules/
+test/
+dist/
+.gitee/
+.svn/
+
+*.bat
