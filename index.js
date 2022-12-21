@@ -118,7 +118,7 @@ async function prerender(config) {
       html = config.dist + html + ".html";
       const dir = path.dirname(html);
       if (!fs.existsSync(dir))
-        fs.mkdirSync(dir);
+        fs.mkdirSync(dir, { recursive: true });
       const redirected = await page.evaluate(t => location.pathname != t, temp);
       if (redirected) {
         console.log("\x1b[33mpage redirected!", temp, "->", await page.evaluate(() => location.pathname), "\x1b[0m");
@@ -179,16 +179,3 @@ VuePreRender.prototype.apply = function (compiler) {
   })
 }
 exports.VuePreRender = VuePreRender;
-
-exports.crawl = async function (config, onResponse, crawl) {
-  let browser = await getBrowser(config);
-  const page = await browser.newPage();
-  if (onResponse)
-    page.on("response", (r) => {
-      r.url()
-      onResponse(r);
-    });
-  await crawl(page);
-  await page.close();
-  await browser.close();
-}
