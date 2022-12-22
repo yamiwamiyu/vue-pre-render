@@ -42,7 +42,7 @@ npm i @yamiwamiyu/vue-pre-render
 
 | field     | description                                                               |
 |--------|------------------------------------------------------------------|
-| url(*)    | The address of the routing page. For example, '/'' or '/index'<br>You can configure the routing with parameters, such as '/index/param' (generate '/index/param.html') or<br>'/index?key=value' (generate '/index.html')       |
+| url(*)    | The address of the routing page. For example, '/' or '/index'<br>You can configure the routing with parameters, such as '/index/param' (generate '/index/param.html') or<br>'/index?key=value' (generate '/index.html')       |
 | output | The output path of the static page. The default output is consistent with the url. For example, '/' or '/index' will output '/index.html'. Set 'my_index' can be output as 'my_index.html' |
 | [seo](#seo)    | Routes for current page pre rendering                                                  |
 
