@@ -6,4 +6,5 @@ dist/
 .svn/
 
 package-lock.json
+README_zh.md
 *.bat
