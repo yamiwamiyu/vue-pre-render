@@ -1,2 +1,2 @@
-node test
+npm run test
 pause

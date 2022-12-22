@@ -5,4 +5,5 @@ dist/
 .gitee/
 .svn/
 
+package-lock.json
 *.bat

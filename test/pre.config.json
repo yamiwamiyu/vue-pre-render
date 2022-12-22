@@ -1,9 +1,5 @@
 {
-  "port": 9222,
-  "chrome": "",
-  "dist": "dist",
   "headless": false,
-  "serve": 21644,
   "seo": {
     "title": "global title",
     "keywords": [
@@ -11,7 +7,7 @@
       "keyword2",
       "keyword3"
     ],
-    "description": "Your website description",
+    "description": "Your website global description",
     "meta": [
       { 
         "name": "metaname1", 
