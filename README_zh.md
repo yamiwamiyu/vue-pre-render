@@ -75,20 +75,22 @@ module.exports = defineConfig({
   //publicPath: "/", // 这里请不要使用"./"
   
   configureWebpack: {
-    plugins: [new VuePreRender({ routes, })],
+    plugins: process.env.NODE_ENV === 'production' ? 
+      [new VuePreRender({ routes, })] 
+      : []
   }
 })
 ```
 
 
-## 命令行使用示例
+### 3. 命令行使用示例
 
 1.  在项目根目录下新建配置文件pre.config.json，配置内容大致如下
 
 ```
 {
   "headless": true,
-  "pages": ["/", "/pre", "/dir/indir", "/nopre"]
+  "routes": ["/", "/pre", "/dir/indir", "/nopre"]
 }
 ```
 

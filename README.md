@@ -77,7 +77,9 @@ module.exports = defineConfig({
   //publicPath: "/", // Please don't use "./"
   
   configureWebpack: {
-    plugins: [new VuePreRender({ routes, })],
+    plugins: process.env.NODE_ENV === 'production' ? 
+      [new VuePreRender({ routes, })] 
+      : []
   }
 })
 ```
