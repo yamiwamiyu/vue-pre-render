@@ -186,7 +186,7 @@ render complete! /
 Pre rendering is complete!
 ```
 
-`page redirected! /nopre -> /` 代表路由页面从/pre跳转到了/<br>出现这种情况的原因例如页面需要登录才能展示，由于没有登录而跳转到了登录页<br>虽然最终也生成了/nopre.html，但是/nopre.html的内容是原始的/index.html的内容
+`page redirected! /nopre -> /` 代表路由页面从/nopre跳转到了/<br>出现这种情况的原因例如页面需要登录才能展示，由于没有登录而跳转到了登录页<br>虽然最终也生成了/nopre.html，但是/nopre.html的内容是原始的/index.html的内容
 
 
 2.  输出结果

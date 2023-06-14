@@ -211,7 +211,12 @@ render complete! /
 Pre rendering is complete!
 ```
 
-`page redirected! /nopre -> /` This means that the page url is redirected from "/pre" to "/"<br>The reason for this is that, for example, the page needs to be logged in to display, but it jumps to the login page because there is no login<br>Although '/nopre.html' is finally generated, the content of '/nopre.html' is the original '/index.html' content
+`page redirected! /nopre -> /`
+This means that the page url is redirected from "/nopre" to "/"
+
+The reason for this is that, for example, the page needs to be logged in to display, but it jumps to the login page because there is no login
+
+Although '/nopre.html' is finally generated, the content of '/nopre.html' is the original '/index.html' content
 
 
 2.  Result
